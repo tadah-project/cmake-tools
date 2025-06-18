@@ -1,54 +1,15 @@
-# --------------------------------------------------------------------
-#  Interface target that carries every compile / link option shared
-#  by the organisation’s C++ modules.
-#
-#  User-visible cache options:
-#    TADAH_USE_ASAN  – ON/OFF (default OFF) add AddressSanitizer to
-#                      Debug and RelWithDebInfo builds
-#
-#  Build configurations handled:
-#    Debug
-#    RelWithDebInfo
-#    Release
-#    MinSizeRel
-# --------------------------------------------------------------------
-# --------------------------------------------------------------------
-#  Common compile / link options
-# --------------------------------------------------------------------
-if(NOT DEFINED _TADAH_COMPILE_OPTS_INCLUDED)
-  set(_TADAH_COMPILE_OPTS_INCLUDED 1)
+cmake_minimum_required(VERSION 3.12)
+project(tadah_cmake LANGUAGES CXX)
 
-  option(TADAH_USE_ASAN        "Add AddressSanitizer to Debug/RelWithDebInfo" OFF)
-  option(TADAH_ENABLE_PROFILING "Add -pg to all objects and links"           OFF)
+# define the interface target
+include(cmake/TadahCompileOptions.cmake)
 
-  add_library(tadah::compile_options INTERFACE)
+# --- OPTIONAL: installation so the helper can also be installed with `make install` ---
+install(TARGETS tadah::compile_options EXPORT tadah_cmakeTargets)
 
-  # ---------------- compile options --------------------------------
-  target_compile_options(tadah::compile_options INTERFACE
-    -Wall -Wextra -Wpedantic -pedantic-errors                # always-on warnings
+install(EXPORT tadah_cmakeTargets
+        NAMESPACE tadah::
+        DESTINATION lib/cmake/tadah_cmake)
 
-    # Sanitiser (compiler side)
-    $<$<AND:$<BOOL:${TADAH_USE_ASAN}>,
-              $<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>>:-fsanitize=address>
-
-    # Optimisation / debug info
-    $<$<CONFIG:Debug>          : -g -Og>
-    $<$<CONFIG:RelWithDebInfo> : -g -O2>
-    $<$<CONFIG:Release>        : -O3>
-    $<$<CONFIG:MinSizeRel>     : -Os>
-
-    # Profiling
-    $<$<BOOL:${TADAH_ENABLE_PROFILING}>:-pg>
-  )
-
-  # ---------------- link options -----------------------------------
-  target_link_options(tadah::compile_options INTERFACE
-    # Sanitiser (linker side)
-    $<$<AND:$<BOOL:${TADAH_USE_ASAN}>,
-              $<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>>:-fsanitize=address>
-
-    # Profiling
-    $<$<BOOL:${TADAH_ENABLE_PROFILING}>:-pg>
-  )
-endif()
-
+install(FILES cmake/TadahCompileOptions.cmake
+        DESTINATION lib/cmake/tadah_cmake)
