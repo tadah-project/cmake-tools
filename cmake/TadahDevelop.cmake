@@ -55,7 +55,7 @@ function(tadah_get_git_branch out_var)
     set(_branch "$ENV{CI_COMMIT_REF_NAME}")
   else()
     execute_process(
-      COMMAND bash -c "git status | grep origin |sed -e 's/.*origin\\///' -e 's/[^a-zA-Z\\/_-].*//'"
+      COMMAND bash -c "git status | grep origin |sed -e 's/.*origin\\///' -e 's/[^a-zA-Z\/_-].*//'"
       WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
       OUTPUT_VARIABLE _branch
       OUTPUT_STRIP_TRAILING_WHITESPACE)
