@@ -28,7 +28,7 @@ target_compile_options(tadah_compile_options INTERFACE
   $<$<CONFIG:RelWithDebInfo>:-g;-O2>
 
   # Release / MinSizeRel
-  $<$<CONFIG:Release>   :-O3>
+  $<$<CONFIG:Release>:-O3>
   $<$<CONFIG:MinSizeRel>:-Os>
 
   # Profiling
