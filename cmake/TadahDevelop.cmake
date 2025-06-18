@@ -40,3 +40,28 @@ function(tadah_use_local_module fetch_name subdir)
 
   message(STATUS "TADAH_DEVELOP: '${fetch_name}' will be taken from ${local_path}")
 endfunction()
+
+#--------------------------------------------------------------------
+#  tadah_get_git_branch(<outVar>)
+#
+#  Returns the current Git branch in <outVar>.  The algorithm is
+#  *exactly* the same that the projects used before:
+#
+#    • in CI  →  $CI_COMMIT_REF_NAME
+#    • local  →  bash -c "git status | grep origin | sed …"
+#--------------------------------------------------------------------
+function(tadah_get_git_branch out_var)
+  if(NOT DEFINED GIT_BRANCH AND DEFINED ENV{CI_COMMIT_REF_NAME})
+    set(_branch "$ENV{CI_COMMIT_REF_NAME}")
+  else()
+    execute_process(
+      COMMAND bash -c "git status | grep origin |sed -e 's/.*origin\\///' -e 's/[^a-zA-Z\\/_-].*//'"
+      WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+      OUTPUT_VARIABLE _branch
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  endif()
+
+  # hand the value back to the caller
+  set(${out_var} "${_branch}" PARENT_SCOPE)
+endfunction()
+
