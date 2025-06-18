@@ -51,7 +51,7 @@ endfunction()
 #    • local  →  bash -c "git status | grep origin | sed …"
 #--------------------------------------------------------------------
 function(tadah_get_git_branch out_var)
-  if(NOT DEFINED GIT_BRANCH AND DEFINED ENV{CI_COMMIT_REF_NAME})
+  if(DEFINED ENV{CI_COMMIT_REF_NAME})
     set(_branch "$ENV{CI_COMMIT_REF_NAME}")
   else()
     execute_process(
