@@ -3,7 +3,9 @@
 # --------------------------------------------------------------------
 if(NOT DEFINED _TADAH_COMPILE_OPTS_INCLUDED)
   set(_TADAH_COMPILE_OPTS_INCLUDED 1)
-  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+  
+  set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL
+    "Generate compile_commands.json for the whole build" FORCE)
   
   option(TADAH_USE_ASAN         "Add AddressSanitizer"            OFF)
   option(TADAH_ENABLE_PROFILING "Add -pg to compiler & linker"    OFF)
