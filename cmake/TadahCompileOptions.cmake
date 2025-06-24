@@ -25,7 +25,7 @@ target_compile_options(tadah_compile_options INTERFACE
   $<$<CONFIG:Debug>:-g;-Og>
 
   # RelWithDebInfo  (release-like, with symbols)
-  $<$<CONFIG:RelWithDebInfo>:-g;-O2>
+  $<$<CONFIG:RelWithDebInfo>:-g;-O3>
 
   # Release / MinSizeRel
   $<$<CONFIG:Release>:-O3>
