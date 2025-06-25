@@ -53,6 +53,10 @@ endfunction()
 function(tadah_get_git_branch out_var)
   if(DEFINED ENV{CI_COMMIT_REF_NAME})
     set(_branch "$ENV{CI_COMMIT_REF_NAME}")
+    message(STATUS "CI/CD branch: ${_branch}")
+  elseif(DEFINED ENV{READTHEDOCS} AND ENV{READTHEDOCS})
+    set(_branch $ENV{READTHEDOCS_VERSION})
+    message(STATUS "RTD branch: ${_branch}")
   else()
     execute_process(
       COMMAND bash -c "git status | grep origin |sed -e 's/.*origin\\///' -e 's/[^a-zA-Z\/_-].*//'"
