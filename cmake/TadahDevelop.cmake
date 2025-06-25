@@ -51,6 +51,7 @@ endfunction()
 #    • local  →  bash -c "git status | grep origin | sed …"
 #--------------------------------------------------------------------
 function(tadah_get_git_branch out_var)
+  message(STATUS "Getting branch name...")
   if(DEFINED ENV{CI_COMMIT_REF_NAME})
     set(_branch "$ENV{CI_COMMIT_REF_NAME}")
     message(STATUS "CI/CD branch: ${_branch}")
@@ -67,5 +68,6 @@ function(tadah_get_git_branch out_var)
 
   # hand the value back to the caller
   set(${out_var} "${_branch}" PARENT_SCOPE)
+  message(STATUS "Getting branch done")
 endfunction()
 
