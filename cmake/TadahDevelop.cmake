@@ -51,23 +51,29 @@ endfunction()
 #    • local  →  bash -c "git status | grep origin | sed …"
 #--------------------------------------------------------------------
 function(tadah_get_git_branch out_var)
+  # Don't override an existing value (set in caller scope or via -D... cache)
+  if(DEFINED ${out_var} AND NOT "${${out_var}}" STREQUAL "")
+    message(STATUS "${out_var} already set to '${${out_var}}' — skipping detection")
+    return()
+  endif()
+
   message(STATUS "Getting branch name...")
   if(DEFINED ENV{CI_COMMIT_REF_NAME})
     set(_branch "$ENV{CI_COMMIT_REF_NAME}")
     message(STATUS "CI/CD branch: ${_branch}")
   elseif(DEFINED ENV{READTHEDOCS_VERSION})
-    set(_branch $ENV{READTHEDOCS_VERSION})
+    set(_branch "$ENV{READTHEDOCS_VERSION}")
     message(STATUS "RTD branch: ${_branch}")
   else()
     execute_process(
       COMMAND bash -c "git status | grep origin |sed -e 's/.*origin\\///' -e 's/[^a-zA-Z\/_-].*//'"
       WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
       OUTPUT_VARIABLE _branch
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
   endif()
 
-  # hand the value back to the caller
   set(${out_var} "${_branch}" PARENT_SCOPE)
-  message(STATUS "Getting branch done")
+  message(STATUS "Getting branch done: ${_branch}")
 endfunction()
 
