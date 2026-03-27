@@ -71,6 +71,16 @@ function(tadah_get_git_branch out_var)
       OUTPUT_VARIABLE _branch
       OUTPUT_STRIP_TRAILING_WHITESPACE
     )
+    # Fallback: if no upstream tracking branch, use the local branch name
+    if("${_branch}" STREQUAL "")
+      execute_process(
+        COMMAND git branch --show-current
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        OUTPUT_VARIABLE _branch
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+      message(STATUS "No tracking branch found, using local branch: ${_branch}")
+    endif()
   endif()
 
   set(${out_var} "${_branch}" PARENT_SCOPE)
