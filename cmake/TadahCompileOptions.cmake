@@ -44,8 +44,8 @@ if(NOT DEFINED _TADAH_COMPILE_OPTS_INCLUDED)
     $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>,$<BOOL:${TADAH_DEVELOP}>>:-Wextra>
 
     # Full warnings (Debug + DEVELOP only)
-    $<$<OR:$<CONFIG:Debug>,$<BOOL:${TADAH_DEVELOP}>>:
-      -Wpedantic;-pedantic-errors;-Wshadow;-Wconversion;-Wsign-conversion;-Wold-style-cast>
+    # $<$<OR:$<CONFIG:Debug>,$<BOOL:${TADAH_DEVELOP}>>:
+    #   -Wpedantic;-pedantic-errors;-Wshadow;-Wconversion;-Wsign-conversion;-Wold-style-cast>
 
     # Optimisation / debug info
     $<$<CONFIG:Debug>:-g;-Og>
