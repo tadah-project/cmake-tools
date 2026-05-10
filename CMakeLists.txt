@@ -5,6 +5,7 @@ include(cmake/TadahCompileOptions.cmake)
 include(cmake/TadahDevelop.cmake)
 include(cmake/TadahProjectSetup.cmake)
 include(cmake/TadahTesting.cmake)
+include(cmake/TadahVersion.cmake)
 
 # install only the *real* target, ALIAS targets are never installable
 install(TARGETS tadah_compile_options EXPORT tadah_cmakeTargets)
@@ -18,6 +19,7 @@ install(FILES
         cmake/TadahDevelop.cmake
         cmake/TadahProjectSetup.cmake
         cmake/TadahTesting.cmake
+        cmake/TadahVersion.cmake
         DESTINATION lib/cmake/tadah_cmake)
 
 install(DIRECTORY testing/ DESTINATION lib/cmake/tadah_cmake/testing)
