@@ -44,11 +44,15 @@ endfunction()
 #--------------------------------------------------------------------
 #  tadah_get_git_branch(<outVar>)
 #
-#  Returns the current Git branch in <outVar>.  The algorithm is
-#  *exactly* the same that the projects used before:
+#  Returns the current Git branch in <outVar>.  Resolution order:
 #
-#    • in CI  →  $CI_COMMIT_REF_NAME
-#    • local  →  bash -c "git status | grep origin | sed …"
+#    • in GitLab CI  →  $CI_COMMIT_REF_NAME
+#    • on ReadTheDocs →  $READTHEDOCS_VERSION_NAME (verbose ref name,
+#                        matches the actual git branch — e.g.
+#                        "release/beta-prep"), with $READTHEDOCS_VERSION
+#                        (URL slug — "release-beta-prep") as a fallback
+#                        for environments that pre-date the _NAME var.
+#    • local         →  bash -c "git status | grep origin | sed …"
 #--------------------------------------------------------------------
 function(tadah_get_git_branch out_var)
   # Don't override an existing value (set in caller scope or via -D... cache)
@@ -61,9 +65,12 @@ function(tadah_get_git_branch out_var)
   if(DEFINED ENV{CI_COMMIT_REF_NAME})
     set(_branch "$ENV{CI_COMMIT_REF_NAME}")
     message(STATUS "CI/CD branch: ${_branch}")
+  elseif(DEFINED ENV{READTHEDOCS_VERSION_NAME})
+    set(_branch "$ENV{READTHEDOCS_VERSION_NAME}")
+    message(STATUS "RTD branch (verbose): ${_branch}")
   elseif(DEFINED ENV{READTHEDOCS_VERSION})
     set(_branch "$ENV{READTHEDOCS_VERSION}")
-    message(STATUS "RTD branch: ${_branch}")
+    message(STATUS "RTD branch (slug fallback): ${_branch}")
   else()
     execute_process(
       COMMAND bash -c "git status | grep origin |sed -e 's/.*origin\\///' -e 's/[^a-zA-Z\/_-].*//'"
