@@ -13,21 +13,29 @@
 #          [REQUIRED])
 #
 #  Behaviour:
-#    * If BLUEPRINT_FILE is given, parses that file.
-#    * Otherwise searches a list of common locations:
-#        - ${Tadah.CORE_SOURCE_DIR}/blueprint/blueprint_tadah.toml
-#          (set by FetchContent when CORE is pulled in)
-#        - ${PROJECT_SOURCE_DIR}/blueprint/blueprint_tadah.toml
-#          (CORE itself)
-#        - ${PROJECT_SOURCE_DIR}/../CORE/blueprint/blueprint_tadah.toml
-#        - ${PROJECT_SOURCE_DIR}/../core/blueprint/blueprint_tadah.toml
-#          (developer worktree sibling layouts)
-#    * If REQUIRED is given and no version is found, the configure
-#      step fails. Otherwise sets <output_var> to "0.0.0" and emits a
-#      single STATUS message.
+#    * If BLUEPRINT_FILE is given, parses exactly that file.
+#    * Otherwise the blueprint is located through Tadah.CORE itself:
+#        - the FetchContent source dir of Tadah.CORE (populated by
+#          FetchContent_MakeAvailable(Tadah.CORE), including the
+#          FETCHCONTENT_SOURCE_DIR_TADAH.CORE override used by
+#          developer builds);
+#        - ${Tadah.CORE_SOURCE_DIR}, set by CORE's own project() call.
+#      Callers therefore read the version AFTER their Tadah dependencies
+#      have been made available, then re-state project(... VERSION ...).
+#    * A missing blueprint, a missing [TADAH].version line or a version
+#      without a numeric M.m.p prefix is a configure error. There is no
+#      default version. REQUIRED is accepted for backward compatibility
+#      and has no further effect.
+#    * The blueprint is added to CMAKE_CONFIGURE_DEPENDS of the calling
+#      directory, so bumping the version re-runs the configure step.
 #
-#  Call BEFORE project(... VERSION ...) so the result can be passed in.
+#  Outputs (in the caller's scope):
+#      <output_var>          numeric version for project(VERSION), e.g. 1.5.1
+#      <output_var>_FULL     version string as written, e.g. 1.5.1-rc.1
+#      <output_var>_SOURCE   path of the blueprint that was read
 # ====================================================================
+
+include(FetchContent)
 
 function(tadah_read_version_from_blueprint output_var)
   set(_options REQUIRED)
@@ -40,13 +48,12 @@ function(tadah_read_version_from_blueprint output_var)
   if(_TVR_BLUEPRINT_FILE)
     list(APPEND _candidates "${_TVR_BLUEPRINT_FILE}")
   else()
+    FetchContent_GetProperties(Tadah.CORE)
+    if(tadah.core_POPULATED)
+      list(APPEND _candidates "${tadah.core_SOURCE_DIR}/blueprint/blueprint_tadah.toml")
+    endif()
     if(DEFINED Tadah.CORE_SOURCE_DIR)
       list(APPEND _candidates "${Tadah.CORE_SOURCE_DIR}/blueprint/blueprint_tadah.toml")
-    endif()
-    if(DEFINED PROJECT_SOURCE_DIR)
-      list(APPEND _candidates "${PROJECT_SOURCE_DIR}/blueprint/blueprint_tadah.toml")
-      list(APPEND _candidates "${PROJECT_SOURCE_DIR}/../CORE/blueprint/blueprint_tadah.toml")
-      list(APPEND _candidates "${PROJECT_SOURCE_DIR}/../core/blueprint/blueprint_tadah.toml")
     endif()
   endif()
 
@@ -60,16 +67,20 @@ function(tadah_read_version_from_blueprint output_var)
   endforeach()
 
   if(NOT _blueprint)
-    if(_TVR_REQUIRED)
-      message(FATAL_ERROR
-        "tadah_read_version_from_blueprint: could not find blueprint_tadah.toml. "
-        "Searched: ${_candidates}")
+    if(_candidates)
+      set(_searched "Searched: ${_candidates}")
+    else()
+      string(CONCAT _searched
+        "Tadah.CORE has not been made available yet: call "
+        "FetchContent_MakeAvailable() for the Tadah dependencies "
+        "before reading the version, or pass BLUEPRINT_FILE.")
     endif()
-    message(STATUS
-      "tadah_read_version_from_blueprint: blueprint not found, defaulting version to 0.0.0")
-    set(${output_var} "0.0.0" PARENT_SCOPE)
-    return()
+    message(FATAL_ERROR
+      "tadah_read_version_from_blueprint: could not find "
+      "blueprint_tadah.toml. ${_searched}")
   endif()
+
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_blueprint}")
 
   # ---- Parse [TADAH] table ---------------------------------------
   file(STRINGS "${_blueprint}" _blueprintLines)
@@ -96,14 +107,8 @@ function(tadah_read_version_from_blueprint output_var)
     "(^|\n)[ \t]*version[ \t]*=[ \t]*[\"']([^\"']+)[\"']"
     _match "${_tadahBlock}")
   if(NOT _match)
-    if(_TVR_REQUIRED)
-      message(FATAL_ERROR
-        "tadah_read_version_from_blueprint: 'version = \"...\"' not found in [TADAH] of ${_blueprint}")
-    endif()
-    message(STATUS
-      "tadah_read_version_from_blueprint: version line missing in ${_blueprint}, defaulting to 0.0.0")
-    set(${output_var} "0.0.0" PARENT_SCOPE)
-    return()
+    message(FATAL_ERROR
+      "tadah_read_version_from_blueprint: 'version = \"...\"' not found in [TADAH] of ${_blueprint}")
   endif()
 
   set(_version "${CMAKE_MATCH_2}")
@@ -113,7 +118,9 @@ function(tadah_read_version_from_blueprint output_var)
   # CMake regex does not support `{n,m}` quantifiers — use `*`.
   string(REGEX MATCH "^[0-9]+(\\.[0-9]+)*" _numeric "${_version}")
   if(NOT _numeric)
-    set(_numeric "0.0.0")
+    message(FATAL_ERROR
+      "tadah_read_version_from_blueprint: version '${_version}' in ${_blueprint} "
+      "does not start with a numeric M.m.p component")
   endif()
 
   set(${output_var}        "${_numeric}" PARENT_SCOPE)

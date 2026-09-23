@@ -52,7 +52,11 @@ endfunction()
 #                        "release/beta-prep"), with $READTHEDOCS_VERSION
 #                        (URL slug — "release-beta-prep") as a fallback
 #                        for environments that pre-date the _NAME var.
-#    • local         →  bash -c "git status | grep origin | sed …"
+#    • local         →  the upstream branch of HEAD (origin/<b> → <b>),
+#                        else the local branch name. Outside a branch
+#                        checkout (tarball, detached HEAD) <outVar> is
+#                        left empty with a warning; pass -D<outVar>=<b>
+#                        when the modules must be fetched.
 #--------------------------------------------------------------------
 function(tadah_get_git_branch out_var)
   # Don't override an existing value (set in caller scope or via -D... cache)
@@ -72,20 +76,30 @@ function(tadah_get_git_branch out_var)
     set(_branch "$ENV{READTHEDOCS_VERSION}")
     message(STATUS "RTD branch (slug fallback): ${_branch}")
   else()
+    # Prefer the upstream branch name (the ref FetchContent would clone);
+    # fall back to the local branch name when nothing is tracked.
     execute_process(
-      COMMAND bash -c "git status | grep origin |sed -e 's/.*origin\\///' -e 's/[^a-zA-Z\/_-].*//'"
+      COMMAND git rev-parse --abbrev-ref --symbolic-full-name "@{upstream}"
       WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-      OUTPUT_VARIABLE _branch
+      OUTPUT_VARIABLE _upstream
       OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    # Fallback: if no upstream tracking branch, use the local branch name
-    if("${_branch}" STREQUAL "")
+      ERROR_QUIET
+      RESULT_VARIABLE _rc)
+    if(_rc EQUAL 0 AND _upstream MATCHES "^[^/]+/(.+)$")
+      set(_branch "${CMAKE_MATCH_1}")
+    else()
       execute_process(
         COMMAND git branch --show-current
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         OUTPUT_VARIABLE _branch
         OUTPUT_STRIP_TRAILING_WHITESPACE
-      )
+        ERROR_QUIET)
+      if("${_branch}" STREQUAL "")
+        message(WARNING
+          "tadah_get_git_branch: cannot determine the git branch of "
+          "${CMAKE_SOURCE_DIR} (detached HEAD or not a git checkout). "
+          "Pass -D${out_var}=<branch> if Tadah modules must be fetched.")
+      endif()
       message(STATUS "No tracking branch found, using local branch: ${_branch}")
     endif()
   endif()
