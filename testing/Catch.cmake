@@ -45,7 +45,19 @@ same as the Catch name; see also ``TEST_PREFIX`` and ``TEST_SUFFIX``.
   list of tests is obtained.  Since test discovery occurs at build time, it is
   not necessary to re-run CMake when the list of tests changes.
   However, it requires that :prop_tgt:`CROSSCOMPILING_EMULATOR` is properly set
-  in order to function in a cross-compiling environment.
+  in order to function in a cross-compiling environment.  The executable is
+  also relinked, and its tests re-discovered, when the discovery script
+  (``CatchAddTests.cmake``) changes.
+
+  Tadah: each discovered test runs its test case through a Catch test spec
+  that selects exactly that case (the name in double quotes, taken verbatim
+  whatever characters it contains) and passes ``--warn NoTests``, so a spec
+  that matches nothing fails.  A name Catch cannot select exactly stops the
+  build: a leading or trailing ``*``, a blank name, or a name that differs
+  from another test case's name, hidden ones included, only in letter case
+  or surrounding whitespace.  Hidden test cases (``[.]``, ``[.tag]``,
+  ``[!benchmark]``) are not discovered; register them with an explicit
+  ``add_test`` that passes ``--warn NoTests``.  See ``CatchAddTests.cmake``.
 
   Additionally, setting properties on tests is somewhat less convenient, since
   the tests are not available at CMake time.  Additional test properties may be
@@ -68,6 +80,9 @@ same as the Catch name; see also ``TEST_PREFIX`` and ``TEST_SUFFIX``.
 
   ``EXTRA_ARGS arg1...``
     Any extra arguments to pass on the command line to each test case.
+    Every test case already gets ``--warn NoTests`` and Catch accepts
+    ``--warn`` only once, so an argument Catch reads as ``--warn`` or ``-w``
+    stops the build.
 
   ``WORKING_DIRECTORY dir``
     Specifies the directory in which to run the discovered test cases.  If this
@@ -92,7 +107,10 @@ same as the Catch name; see also ``TEST_PREFIX`` and ``TEST_SUFFIX``.
     Make the list of tests available in the variable ``var``, rather than the
     default ``<target>_TESTS``.  This can be useful when the same test
     executable is being used in multiple calls to ``catch_discover_tests()``.
-    Note that this variable is only available in CTest.
+    Note that this variable is only available in CTest.  It is a CMake list:
+    a ``;`` in a test name is escaped, but a name with unbalanced square
+    brackets or a trailing backslash cannot be represented as one list
+    element (a CMake list limitation; test registration is unaffected).
 
   ``REPORTER reporter``
     Use the specified reporter when running the test case. The reporter will
@@ -146,27 +164,36 @@ function(catch_discover_tests TARGET)
     TARGET ${TARGET}
     PROPERTY CROSSCOMPILING_EMULATOR
   )
+  # Each -D value is wrapped in single quotes: `cmake -D` strips trailing
+  # whitespace from a value and one pair of enclosing single quotes, so the
+  # quotes make it pass every value exactly (e.g. a TEST_PREFIX ending in a
+  # space).
   add_custom_command(
     TARGET ${TARGET} POST_BUILD
     BYPRODUCTS "${ctest_tests_file}"
     COMMAND "${CMAKE_COMMAND}"
-            -D "TEST_TARGET=${TARGET}"
-            -D "TEST_EXECUTABLE=$<TARGET_FILE:${TARGET}>"
-            -D "TEST_EXECUTOR=${crosscompiling_emulator}"
-            -D "TEST_WORKING_DIR=${_WORKING_DIRECTORY}"
-            -D "TEST_SPEC=${_TEST_SPEC}"
-            -D "TEST_EXTRA_ARGS=${_EXTRA_ARGS}"
-            -D "TEST_PROPERTIES=${_PROPERTIES}"
-            -D "TEST_PREFIX=${_TEST_PREFIX}"
-            -D "TEST_SUFFIX=${_TEST_SUFFIX}"
-            -D "TEST_LIST=${_TEST_LIST}"
-            -D "TEST_REPORTER=${_REPORTER}"
-            -D "TEST_OUTPUT_DIR=${_OUTPUT_DIR}"
-            -D "TEST_OUTPUT_PREFIX=${_OUTPUT_PREFIX}"
-            -D "TEST_OUTPUT_SUFFIX=${_OUTPUT_SUFFIX}"
-            -D "CTEST_FILE=${ctest_tests_file}"
+            -D "TEST_TARGET='${TARGET}'"
+            -D "TEST_EXECUTABLE='$<TARGET_FILE:${TARGET}>'"
+            -D "TEST_EXECUTOR='${crosscompiling_emulator}'"
+            -D "TEST_WORKING_DIR='${_WORKING_DIRECTORY}'"
+            -D "TEST_SPEC='${_TEST_SPEC}'"
+            -D "TEST_EXTRA_ARGS='${_EXTRA_ARGS}'"
+            -D "TEST_PROPERTIES='${_PROPERTIES}'"
+            -D "TEST_PREFIX='${_TEST_PREFIX}'"
+            -D "TEST_SUFFIX='${_TEST_SUFFIX}'"
+            -D "TEST_LIST='${_TEST_LIST}'"
+            -D "TEST_REPORTER='${_REPORTER}'"
+            -D "TEST_OUTPUT_DIR='${_OUTPUT_DIR}'"
+            -D "TEST_OUTPUT_PREFIX='${_OUTPUT_PREFIX}'"
+            -D "TEST_OUTPUT_SUFFIX='${_OUTPUT_SUFFIX}'"
+            -D "CTEST_FILE='${ctest_tests_file}'"
             -P "${_CATCH_DISCOVER_TESTS_SCRIPT}"
     VERBATIM
+  )
+  # The POST_BUILD step runs only when TARGET is linked; relink it when the
+  # discovery script changes, so a new script re-discovers the tests.
+  set_property(TARGET ${TARGET} APPEND PROPERTY
+    LINK_DEPENDS "${_CATCH_DISCOVER_TESTS_SCRIPT}"
   )
 
   file(WRITE "${ctest_include_file}"
