@@ -17,6 +17,18 @@ target_link_libraries(myexe PRIVATE tadah::compile_options)
 The Tadah modules fetch cmake-tools at `v1-dev` during development; a
 release pins a tag instead.
 
+## Removed build options
+
+`cmake/TadahCompileOptions.cmake` stops the configure step when a removed
+option is switched on. Every Tadah module fetches cmake-tools, and so runs
+this file, before it declares any target of its own, so the check covers the
+umbrella build, a standalone build of any module and the LAMMPS plugin build
+alike. Setting a removed option to `OFF` (as older presets do) is accepted.
+
+| Option | Removed in | Use instead |
+|---|---|---|
+| `TADAH_BUILD_MPI` | 1.5.1 (the legacy ScaLAPACK training build, `tadah_mpi`) | `TADAH_HPO_MPI` for MPI-parallel `TADAH:ANNEAL_PT` / `ANNEAL_PA` in HPO (needs `TADAH_ENABLE_NFP=ON` and an MPI build of LAMMPS); OpenMP threads for training |
+
 ## Testing
 
 Every Tadah module builds its Catch2 (v2) unit tests the same way. Tests are
