@@ -14,9 +14,30 @@
 #  of CMAKE_BUILD_TYPE, so e.g.:
 #    cmake .. -DTADAH_DEVELOP=ON -DCMAKE_BUILD_TYPE=Release
 #  produces an optimised -O3 build with all warnings.
+#
+#  Removed build options are rejected here, because every Tadah module
+#  configures this file (through FetchContent of cmake-tools) before it
+#  declares any target of its own.
 # --------------------------------------------------------------------
 if(NOT DEFINED _TADAH_COMPILE_OPTS_INCLUDED)
   set(_TADAH_COMPILE_OPTS_INCLUDED 1)
+
+  # ---- Removed options -------------------------------------------
+  # TADAH_BUILD_MPI selected the legacy ScaLAPACK training build
+  # (`tadah_mpi`), removed in 1.5.1. ON is an error rather than being
+  # ignored, so a stale cache or preset cannot silently give a serial
+  # build; OFF (as in older presets) is accepted.
+  if(TADAH_BUILD_MPI)
+    message(FATAL_ERROR
+      "TADAH_BUILD_MPI=ON: the legacy MPI training build (tadah_mpi, "
+      "ScaLAPACK) was removed in Tadah 1.5.1. Training runs in one process "
+      "(OpenMP threads: TADAH_ENABLE_OPENMP). For MPI-parallel "
+      "hyperparameter optimisation (TADAH:ANNEAL_PT / ANNEAL_PA replicas "
+      "over MPI ranks) configure with -DTADAH_HPO_MPI=ON instead; it needs "
+      "TADAH_ENABLE_NFP=ON and an MPI build of LAMMPS. Set "
+      "-DTADAH_BUILD_MPI=OFF, or delete it from the CMake cache "
+      "(-UTADAH_BUILD_MPI) and from your preset.")
+  endif()
 
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL
       "Generate compile_commands.json for the whole build" FORCE)
