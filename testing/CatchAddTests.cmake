@@ -43,6 +43,11 @@
 #    "No tests" is decided from the parsed names and is a warning.
 #  * Every value is written to CTEST_FILE as a bracket argument whose closing
 #    delimiter cannot occur in the value, so names reach CTest verbatim.
+#  * Every entry has the SKIP_REGULAR_EXPRESSION of the TADAH-SKIP marker
+#    (TadahTestSkip.cmake, next to this script): a test case that calls
+#    TADAH_SKIP() (tadah_test_skip.hpp) is reported as Skipped, not Passed.
+#    PROPERTIES that set SKIP_REGULAR_EXPRESSION would replace it and are a
+#    hard error.
 #
 # Limitation: a listed line that starts with '"#' and ends with '"' is read as
 # a '#' name. A test case whose name really is quoted that way is registered
@@ -57,6 +62,9 @@
 # Policies for the script itself (CMP0054: a quoted value is never
 # dereferenced as a variable name in if(), whatever a test case is called).
 cmake_minimum_required(VERSION 3.15)
+
+# TADAH_TEST_SKIP_MARKER and TADAH_TEST_SKIP_REGULAR_EXPRESSION.
+include("${CMAKE_CURRENT_LIST_DIR}/TadahTestSkip.cmake")
 
 set(prefix "${TEST_PREFIX}")
 set(suffix "${TEST_SUFFIX}")
@@ -218,6 +226,20 @@ foreach(arg IN LISTS extra_args)
       "reads as --warn. Every discovered test already passes --warn NoTests, "
       "and Catch2 accepts --warn only once (a second one makes every test "
       "fail). Remove it from EXTRA_ARGS.\n"
+    )
+  endif()
+endforeach()
+
+# Every entry reports a TADAH_SKIP() case as Skipped; a second
+# SKIP_REGULAR_EXPRESSION would replace that one.
+foreach(arg IN LISTS properties)
+  if(arg STREQUAL "SKIP_REGULAR_EXPRESSION")
+    message(FATAL_ERROR
+      "PROPERTIES of '${TEST_EXECUTABLE}' set SKIP_REGULAR_EXPRESSION. "
+      "Every discovered test already has one: CTest reports a test case "
+      "whose output has a line starting with '${TADAH_TEST_SKIP_MARKER}' "
+      "as Skipped (TADAH_SKIP() in tadah_test_skip.hpp), and a second value "
+      "would replace it. Remove it from PROPERTIES.\n"
     )
   endif()
 endforeach()
@@ -390,6 +412,8 @@ while(index LESS names_count)
   _catch_append_arg(_catch_cmd "PROPERTIES")
   _catch_append_arg(_catch_cmd "WORKING_DIRECTORY")
   _catch_append_arg(_catch_cmd "${TEST_WORKING_DIR}")
+  _catch_append_arg(_catch_cmd "SKIP_REGULAR_EXPRESSION")
+  _catch_append_arg(_catch_cmd "${TADAH_TEST_SKIP_REGULAR_EXPRESSION}")
   foreach(arg IN LISTS properties)
     _catch_append_arg(_catch_cmd "${arg}")
   endforeach()

@@ -59,6 +59,14 @@ same as the Catch name; see also ``TEST_PREFIX`` and ``TEST_SUFFIX``.
   ``[!benchmark]``) are not discovered; register them with an explicit
   ``add_test`` that passes ``--warn NoTests``.  See ``CatchAddTests.cmake``.
 
+  Tadah: every discovered test has the ``SKIP_REGULAR_EXPRESSION`` of the
+  TADAH-SKIP marker (``TadahTestSkip.cmake``), so a test case that calls
+  ``TADAH_SKIP(<reason>)`` (``tadah_test_skip.hpp``) because an optional
+  input is absent is reported as Skipped, not Passed.  ``PROPERTIES`` that
+  set ``SKIP_REGULAR_EXPRESSION`` stop the build.  Including this module
+  also sets ``TADAH_TEST_SKIP_REGULAR_EXPRESSION``, for an explicit
+  ``add_test`` entry that runs exactly one test case.
+
   Additionally, setting properties on tests is somewhat less convenient, since
   the tests are not available at CMake time.  Additional test properties may be
   assigned to the set of tests as a whole using the ``PROPERTIES`` option.  If
@@ -191,9 +199,13 @@ function(catch_discover_tests TARGET)
     VERBATIM
   )
   # The POST_BUILD step runs only when TARGET is linked; relink it when the
-  # discovery script changes, so a new script re-discovers the tests.
+  # discovery script, or the skip-marker definitions it includes from its
+  # own directory, change, so the tests are discovered again.
+  get_filename_component(_catch_script_dir "${_CATCH_DISCOVER_TESTS_SCRIPT}"
+                         DIRECTORY)
   set_property(TARGET ${TARGET} APPEND PROPERTY
     LINK_DEPENDS "${_CATCH_DISCOVER_TESTS_SCRIPT}"
+                 "${_catch_script_dir}/TadahTestSkip.cmake"
   )
 
   file(WRITE "${ctest_include_file}"
@@ -231,3 +243,7 @@ set(_CATCH_DISCOVER_TESTS_SCRIPT
   ${CMAKE_CURRENT_LIST_DIR}/CatchAddTests.cmake
   CACHE INTERNAL "Catch2 full path to CatchAddTests.cmake helper file"
 )
+
+# TADAH_TEST_SKIP_MARKER and TADAH_TEST_SKIP_REGULAR_EXPRESSION, for explicit
+# add_test() entries that run exactly one test case.
+include("${CMAKE_CURRENT_LIST_DIR}/TadahTestSkip.cmake")
