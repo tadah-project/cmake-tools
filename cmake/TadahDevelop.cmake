@@ -48,6 +48,10 @@ endfunction()
 #  (GIT_TAG ${TADAH_GIT_BRANCH}). A value already set (-D<outVar>=<ref>)
 #  is kept. Otherwise, the first of:
 #
+#  A CI or Read the Docs variable counts only when it is set and not
+#  empty (as in the docs build's source_locator.py); one that is set but
+#  empty is skipped, with a status message.
+#
 #    • in GitLab CI  →  $CI_COMMIT_REF_NAME (the branch, or the tag on a
 #                        tag pipeline)
 #    • on ReadTheDocs →  $READTHEDOCS_GIT_IDENTIFIER, the branch or tag
@@ -76,16 +80,23 @@ function(tadah_get_git_branch out_var)
   endif()
 
   message(STATUS "Getting branch name...")
-  if(DEFINED ENV{CI_COMMIT_REF_NAME})
+  foreach(_var CI_COMMIT_REF_NAME READTHEDOCS_GIT_IDENTIFIER
+               READTHEDOCS_VERSION_NAME READTHEDOCS_VERSION)
+    if(DEFINED ENV{${_var}} AND "$ENV{${_var}}" STREQUAL "")
+      message(STATUS "tadah_get_git_branch: ${_var} is set but empty; "
+                     "it names no ref and is skipped")
+    endif()
+  endforeach()
+  if(NOT "$ENV{CI_COMMIT_REF_NAME}" STREQUAL "")
     set(_branch "$ENV{CI_COMMIT_REF_NAME}")
     message(STATUS "CI/CD branch: ${_branch}")
-  elseif(DEFINED ENV{READTHEDOCS_GIT_IDENTIFIER})
+  elseif(NOT "$ENV{READTHEDOCS_GIT_IDENTIFIER}" STREQUAL "")
     set(_branch "$ENV{READTHEDOCS_GIT_IDENTIFIER}")
     message(STATUS "RTD git identifier: ${_branch}")
-  elseif(DEFINED ENV{READTHEDOCS_VERSION_NAME})
+  elseif(NOT "$ENV{READTHEDOCS_VERSION_NAME}" STREQUAL "")
     set(_branch "$ENV{READTHEDOCS_VERSION_NAME}")
     message(STATUS "RTD branch (verbose): ${_branch}")
-  elseif(DEFINED ENV{READTHEDOCS_VERSION})
+  elseif(NOT "$ENV{READTHEDOCS_VERSION}" STREQUAL "")
     set(_branch "$ENV{READTHEDOCS_VERSION}")
     message(STATUS "RTD branch (slug fallback): ${_branch}")
   else()
