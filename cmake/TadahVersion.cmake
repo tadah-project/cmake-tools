@@ -30,8 +30,8 @@
 #      directory, so bumping the version re-runs the configure step.
 #
 #  Outputs (in the caller's scope):
-#      <output_var>          numeric version for project(VERSION), e.g. 1.5.1
-#      <output_var>_FULL     version string as written, e.g. 1.5.1-rc.1
+#      <output_var>          numeric version for project(VERSION), e.g. 1.6.0
+#      <output_var>_FULL     version string as written, e.g. 1.6.0-rc.1
 #      <output_var>_SOURCE   path of the blueprint that was read
 # ====================================================================
 
