@@ -14,8 +14,37 @@ FetchContent_MakeAvailable(tadah_cmake)
 target_link_libraries(myexe PRIVATE tadah::compile_options)
 ```
 
-The Tadah modules fetch cmake-tools at `v1-dev` during development; a
-release pins a tag instead.
+The Tadah modules fetch cmake-tools at `v1-dev` during development. A
+release tags cmake-tools (`v1.6.0`) and pins that tag in all seven modules
+in the release commit (`Tadah.MLIP/RELEASING.md`).
+
+## Branch detection
+
+`tadah_get_git_branch(<var>)` (`cmake/TadahDevelop.cmake`) names the git
+ref every Tadah module fetches its sibling modules at
+(`GIT_TAG ${TADAH_GIT_BRANCH}`). A value already set, such as
+`-DTADAH_GIT_BRANCH=v1.6.0`, is kept. Otherwise the first of these is used:
+
+1. `$CI_COMMIT_REF_NAME` (GitLab CI: the branch, or the tag of a tag
+   pipeline);
+2. `$READTHEDOCS_GIT_IDENTIFIER` (Read the Docs: the branch or tag it
+   checked out; its `latest` and `stable` versions are named after no ref),
+   then `$READTHEDOCS_VERSION_NAME` and `$READTHEDOCS_VERSION`;
+3. the upstream branch of the checkout of the top-level project
+   (`origin/v1-dev` gives `v1-dev`), else its local branch. The top-level
+   project is the one CMake was started on: `Tadah.MLIP`, a module built on
+   its own, or LAMMPS itself for the `pair_style tadah` build, where the
+   LAMMPS checkout's branch is not a Tadah branch.
+
+A CI or Read the Docs variable counts only when it is set and not empty; one
+that is set but empty names no ref and is skipped, with a status message.
+A release tarball or a detached HEAD has no branch: the function warns and
+leaves the variable empty. Pass `-DTADAH_GIT_BRANCH=<branch or tag>` (for a
+release tarball, its tag, e.g. `v1.6.0`) so that the modules are fetched at
+the matching ref. The docs build looks up the CORE and HPO sources with the
+same variables, in the same order and by the same rule
+(`Tadah.MLIP/docs/source/config/source_locator.py`); Tadah.MLIP's
+`tadah_git_branch_*` tests check both.
 
 ## Removed build options
 
@@ -27,7 +56,7 @@ alike. Setting a removed option to `OFF` (as older presets do) is accepted.
 
 | Option | Removed in | Use instead |
 |---|---|---|
-| `TADAH_BUILD_MPI` | 1.5.1 (the legacy ScaLAPACK training build, `tadah_mpi`) | `TADAH_HPO_MPI` for MPI-parallel `TADAH:ANNEAL_PT` / `ANNEAL_PA` in HPO (needs `TADAH_ENABLE_NFP=ON` and an MPI build of LAMMPS); OpenMP threads for training |
+| `TADAH_BUILD_MPI` | 1.6.0 (the legacy ScaLAPACK training build, `tadah_mpi`) | `TADAH_HPO_MPI` for MPI-parallel `TADAH:ANNEAL_PT` / `ANNEAL_PA` in HPO (needs `TADAH_ENABLE_NFP=ON` and an MPI build of LAMMPS); OpenMP threads for training |
 
 ## Testing
 
