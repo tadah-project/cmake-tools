@@ -83,5 +83,71 @@ catch_discover_tests(test_foo)  # one CTest entry per test case
   add_test(NAME foo_slow COMMAND test_foo "[.slow]" --warn NoTests)
   ```
 
+### Skipped tests: the TADAH-SKIP marker
+
+Catch2 v2 has no skip: a test case that returns early because an optional
+input is absent (an external data file, an environment variable) passes,
+and CTest counts a check that checked nothing. Such a guard calls
+`TADAH_SKIP` from `testing/tadah_test_skip.hpp` (on the `Catch2` target's
+include path) before the test case's first check, directly in the
+`TEST_CASE` body and outside every `SECTION`:
+
+```cpp
+#include "tadah_test_skip.hpp"  // before (or instead of) catch2/catch.hpp
+
+TEST_CASE("uses an optional database", "[db]") {
+  std::ifstream in(path);
+  if (!in.is_open()) {
+    TADAH_SKIP("database not found at " << path);
+  }
+  ...
+}
+```
+
+`TADAH_SKIP(<reason>)` records the reason as a Catch warning, records the
+skip request and returns from the test case. When the test case ends
+without a failed assertion, a Catch listener that the header registers
+writes the line `TADAH-SKIP: <reason>` to standard error. Every test that
+`catch_discover_tests()` registers has the `SKIP_REGULAR_EXPRESSION`
+`TADAH_TEST_SKIP_REGULAR_EXPRESSION` (`testing/TadahTestSkip.cmake`), which
+matches that line at the start of a line, so CTest reports the test as
+**Skipped** although it exits with 0.
+
+- A skip request never hides a failure of the same test case: a check that
+  failed before `TADAH_SKIP`, in another `SECTION`, or after `TADAH_SKIP`
+  returned from a helper function or lambda (it returns only from that
+  function), leaves the test case *Failed*, and no marker is written.
+  Checks that run after the request and pass are not reported: the test
+  case is Skipped.
+- Include `tadah_test_skip.hpp` before `catch2/catch.hpp`, or instead of it
+  (it includes Catch itself): its listener needs Catch's external
+  interfaces, which it switches on with `CATCH_CONFIG_EXTERNAL_INTERFACES`.
+  Included after a plain `catch2/catch.hpp`, it stops the build with a
+  message saying so. It registers its listener once per test binary,
+  whatever the number of translation units that include it.
+- The line is written through C stdio's `stderr`, which the Catch reporters
+  that capture a test case's output (`junit`, `xml`) do not redirect, so
+  the skip reaches CTest with any reporter.
+- Nothing else may print a line that starts with `TADAH-SKIP: `: CTest
+  reports an entry whose output has such a line as Skipped, whatever its
+  exit status. The text inside a line, or quoted in a failed assertion,
+  does not count.
+- `PROPERTIES` of `catch_discover_tests()` that set
+  `SKIP_REGULAR_EXPRESSION` would replace the marker's; they stop the
+  build.
+- An explicit `add_test()` entry that runs exactly **one** test case opts
+  in after `include(Catch)`:
+
+  ```cmake
+  set_tests_properties(foo_oracle PROPERTIES
+    SKIP_REGULAR_EXPRESSION "${TADAH_TEST_SKIP_REGULAR_EXPRESSION}")
+  ```
+
+  Never on an entry that runs several test cases (a tag): the marker of one
+  would report the whole entry as Skipped, failures of the others included.
+- A script entry (not Catch) either exits with a code of its own and sets
+  `SKIP_RETURN_CODE`, as HPO's `hpo_strategy_matrix` does with 77, or
+  prints a line that its own `SKIP_REGULAR_EXPRESSION` matches.
+
 The regression tests for this machinery live in the umbrella repository,
 `Tadah.MLIP/tests/catch_discovery` (`ctest -R tadah_catch`).
