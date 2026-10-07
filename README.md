@@ -210,7 +210,12 @@ tadah_add_header_check(tadah.core HEADER_DIRS
   not. An executable cannot be linked; its own include directories,
   definitions and options are used instead. The definitions of the calling
   directory (`add_compile_definitions` of the module) and the target's C++
-  standard apply too.
+  standard apply too. Each translation unit also has its own header's
+  `HEADER_DIRS` entry as an include directory, searched first, and no
+  other entry: a header that needs a directory the target keeps `PRIVATE`
+  fails, even when that directory is another of the `HEADER_DIRS` (CORE's
+  `generated/`, whose blueprint header users of `tadah.core` in the build
+  tree cannot include).
 - They form the object library `<target>_header_check`, which is not part
   of `all`: a header that fails the check fails a test, not the build. The
   CTest entry `<target>_headers` (label `headers`, so `ctest -L headers`
