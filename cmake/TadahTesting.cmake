@@ -135,9 +135,11 @@ endmacro()
 #  The CTest entry <target>_headers (label `headers`) builds that
 #  library, keeping going past a failed header with the Makefile and
 #  Ninja generators so that one run names every header that fails. It
-#  runs on as many processes as the machine has physical cores
-#  (PROCESSORS, for `ctest -j`), and never alongside another entry of
-#  this kind (RESOURCE_LOCK): they build in the same tree.
+#  runs on TADAH_HEADER_CHECK_JOBS processes (a whole number, 1 or more,
+#  read when the function is called; default: as many as the machine has
+#  physical cores), which is also its PROCESSORS (for `ctest -j`), and
+#  never alongside another entry of this kind (RESOURCE_LOCK): they build
+#  in the same tree.
 # ====================================================================
 function(tadah_add_header_check target)
   cmake_parse_arguments(PARSE_ARGV 1 _thc "" "" "HEADER_DIRS")
@@ -235,9 +237,21 @@ function(tadah_add_header_check target)
     list(APPEND _thc_command --config "$<CONFIG>")
   endif()
   # A bare --parallel is an unbounded `make -j`: give a number.
-  cmake_host_system_information(RESULT _thc_jobs QUERY NUMBER_OF_PHYSICAL_CORES)
-  if(NOT _thc_jobs GREATER 0)
-    set(_thc_jobs 1)
+  if(DEFINED TADAH_HEADER_CHECK_JOBS)
+    if(NOT TADAH_HEADER_CHECK_JOBS MATCHES "^[1-9][0-9]*$")
+      message(FATAL_ERROR "tadah_add_header_check(${target}): "
+                          "TADAH_HEADER_CHECK_JOBS must be a whole number of "
+                          "processes, 1 or more, got "
+                          "'${TADAH_HEADER_CHECK_JOBS}'")
+    endif()
+    set(_thc_jobs "${TADAH_HEADER_CHECK_JOBS}")
+  else()
+    # 0 when CMake cannot tell.
+    cmake_host_system_information(RESULT _thc_jobs
+                                  QUERY NUMBER_OF_PHYSICAL_CORES)
+    if(NOT _thc_jobs GREATER 0)
+      set(_thc_jobs 1)
+    endif()
   endif()
   list(APPEND _thc_command --parallel ${_thc_jobs})
   if(CMAKE_GENERATOR MATCHES "Makefiles")
