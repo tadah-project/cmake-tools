@@ -100,3 +100,148 @@ macro(tadah_end_external_deps)
       CACHE BOOL "Build Tadah module unit tests" FORCE)
   unset(_tadah_ext_build_testing)
 endmacro()
+
+# ====================================================================
+#  Header self-containment check
+#
+#  Usage in a module's tests/CMakeLists.txt:
+#
+#     tadah_add_header_check(tadah.foo)
+#     tadah_add_header_check(tadah.foo HEADER_DIRS <dir> ...)
+#
+#  Every header (*.h, *.hpp) under the HEADER_DIRS (default: the include/
+#  directory next to the target's CMakeLists.txt) gets a translation unit
+#  of its own, generated in the binary directory, that includes it twice
+#  by its path relative to its HEADER_DIRS entry. The header must compile
+#  on its own, with nothing included before it, and the second inclusion
+#  must be harmless (an include guard or #pragma once). The headers are
+#  globbed with CONFIGURE_DEPENDS, so a new header is checked without
+#  being registered anywhere.
+#
+#  The translation units form the object library <target>_header_check,
+#  excluded from `all`, so a header that fails the check fails its test
+#  and does not break the build. They compile with what a consumer of
+#  <target> gets (they link it; an executable, which cannot be linked,
+#  lends its own include directories, compile definitions and options
+#  instead), the definitions of the calling directory (such as a
+#  module's add_compile_definitions()), the target's C++ standard, and
+#  the HEADER_DIRS as include directories. The object files stay in the
+#  build tree, so a rerun recompiles only the headers that changed or
+#  that include a changed header.
+#
+#  The CTest entry <target>_headers (label `headers`) builds that
+#  library, keeping going past a failed header with the Makefile and
+#  Ninja generators so that one run names every header that fails. It
+#  runs on as many processes as the machine has physical cores
+#  (PROCESSORS, for `ctest -j`), and never alongside another entry of
+#  this kind (RESOURCE_LOCK): they build in the same tree.
+# ====================================================================
+function(tadah_add_header_check target)
+  cmake_parse_arguments(PARSE_ARGV 1 _thc "" "" "HEADER_DIRS")
+  if(_thc_UNPARSED_ARGUMENTS)
+    message(FATAL_ERROR "tadah_add_header_check(${target}): unexpected "
+                        "arguments: ${_thc_UNPARSED_ARGUMENTS}")
+  endif()
+  if(NOT TARGET "${target}")
+    message(FATAL_ERROR "tadah_add_header_check: '${target}' is not a target")
+  endif()
+  get_target_property(_thc_imported "${target}" IMPORTED)
+  get_target_property(_thc_alias "${target}" ALIASED_TARGET)
+  if(_thc_imported OR _thc_alias)
+    message(FATAL_ERROR "tadah_add_header_check: '${target}' is an imported "
+                        "or ALIAS target; name the target that is built here")
+  endif()
+  get_target_property(_thc_type "${target}" TYPE)
+  if("HEADER_DIRS" IN_LIST _thc_KEYWORDS_MISSING_VALUES)
+    message(FATAL_ERROR "tadah_add_header_check(${target}): HEADER_DIRS "
+                        "names no directory")
+  endif()
+  if(NOT DEFINED _thc_HEADER_DIRS)
+    get_target_property(_thc_src "${target}" SOURCE_DIR)
+    set(_thc_HEADER_DIRS "${_thc_src}/include")
+  endif()
+
+  set(_thc_name "${target}_header_check")
+  set(_thc_root "${CMAKE_CURRENT_BINARY_DIR}/${_thc_name}")
+  set(_thc_dirs "")
+  set(_thc_tus "")
+  set(_thc_seen "")
+  foreach(_thc_dir IN LISTS _thc_HEADER_DIRS)
+    get_filename_component(_thc_dir "${_thc_dir}" ABSOLUTE)
+    if(NOT IS_DIRECTORY "${_thc_dir}")
+      message(FATAL_ERROR "tadah_add_header_check(${target}): HEADER_DIRS "
+                          "entry ${_thc_dir} is not a directory")
+    endif()
+    list(APPEND _thc_dirs "${_thc_dir}")
+    file(GLOB_RECURSE _thc_headers CONFIGURE_DEPENDS RELATIVE "${_thc_dir}"
+         "${_thc_dir}/*.h" "${_thc_dir}/*.hpp")
+    list(SORT _thc_headers)
+    foreach(_thc_rel IN LISTS _thc_headers)
+      if(_thc_rel IN_LIST _thc_seen)
+        message(FATAL_ERROR "tadah_add_header_check(${target}): ${_thc_rel} "
+                            "is in more than one of the HEADER_DIRS, so "
+                            "#include <${_thc_rel}> is ambiguous")
+      endif()
+      list(APPEND _thc_seen "${_thc_rel}")
+      set(TADAH_HEADER_CHECK_TARGET "${target}")
+      set(TADAH_HEADER_CHECK_HEADER "${_thc_rel}")
+      set(TADAH_HEADER_CHECK_PATH "${_thc_dir}/${_thc_rel}")
+      # configure_file rewrites a file only when its content changes, so a
+      # re-configure does not recompile the checks.
+      configure_file("${_TADAH_CMAKE_TOOLS_DIR}/testing/tadah_header_check.cpp.in"
+                     "${_thc_root}/${_thc_rel}.cpp" @ONLY)
+      list(APPEND _thc_tus "${_thc_root}/${_thc_rel}.cpp")
+    endforeach()
+  endforeach()
+  if(NOT _thc_tus)
+    message(FATAL_ERROR "tadah_add_header_check(${target}): no *.h or *.hpp "
+                        "file in ${_thc_dirs}")
+  endif()
+
+  add_library(${_thc_name} OBJECT EXCLUDE_FROM_ALL ${_thc_tus})
+  target_include_directories(${_thc_name} BEFORE PRIVATE ${_thc_dirs})
+  if(_thc_type STREQUAL "EXECUTABLE")
+    # $<TARGET_PROPERTY> of these build properties includes the usage
+    # requirements of the executable's link dependencies.
+    target_include_directories(${_thc_name} PRIVATE
+      "$<TARGET_PROPERTY:${target},INCLUDE_DIRECTORIES>")
+    target_compile_definitions(${_thc_name} PRIVATE
+      "$<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS>")
+    target_compile_options(${_thc_name} PRIVATE
+      "$<TARGET_PROPERTY:${target},COMPILE_OPTIONS>")
+  else()
+    target_link_libraries(${_thc_name} PRIVATE "${target}")
+  endif()
+  if(NOT _thc_type STREQUAL "INTERFACE_LIBRARY")
+    foreach(_thc_prop CXX_STANDARD CXX_STANDARD_REQUIRED CXX_EXTENSIONS)
+      get_target_property(_thc_value "${target}" ${_thc_prop})
+      if(NOT _thc_value MATCHES "-NOTFOUND$")
+        set_property(TARGET ${_thc_name} PROPERTY ${_thc_prop} "${_thc_value}")
+      endif()
+    endforeach()
+  endif()
+
+  set(_thc_command "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}"
+                   --target ${_thc_name})
+  get_property(_thc_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+  if(_thc_multi)
+    list(APPEND _thc_command --config "$<CONFIG>")
+  endif()
+  # A bare --parallel is an unbounded `make -j`: give a number.
+  cmake_host_system_information(RESULT _thc_jobs QUERY NUMBER_OF_PHYSICAL_CORES)
+  if(NOT _thc_jobs GREATER 0)
+    set(_thc_jobs 1)
+  endif()
+  list(APPEND _thc_command --parallel ${_thc_jobs})
+  if(CMAKE_GENERATOR MATCHES "Makefiles")
+    list(APPEND _thc_command -- -k)
+  elseif(CMAKE_GENERATOR MATCHES "^Ninja")
+    list(APPEND _thc_command -- -k 0)
+  endif()
+  add_test(NAME ${target}_headers COMMAND ${_thc_command})
+  set_tests_properties(${target}_headers PROPERTIES
+    LABELS headers
+    TIMEOUT 900
+    PROCESSORS ${_thc_jobs}
+    RESOURCE_LOCK tadah_header_check)
+endfunction()
