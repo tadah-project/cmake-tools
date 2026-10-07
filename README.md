@@ -219,13 +219,17 @@ tadah_add_header_check(tadah.core HEADER_DIRS
 - They form the object library `<target>_header_check`, which is not part
   of `all`: a header that fails the check fails a test, not the build. The
   CTest entry `<target>_headers` (label `headers`, so `ctest -L headers`
-  runs every module's) builds it with `cmake --build`, on as many processes
-  as the machine has physical cores, keeping going past a failed header
-  with the Makefile and Ninja generators, so its output names every header
-  that fails. The object files stay in the build tree: a rerun compiles
-  only the headers that changed or include one that changed.
+  runs every module's) builds it with `cmake --build`, keeping going past
+  a failed header with the Makefile and Ninja generators, so its output
+  names every header that fails. It builds on as many processes as the
+  machine has physical cores, or on `TADAH_HEADER_CHECK_JOBS` (a whole
+  number, 1 or more, set when configuring:
+  `-DTADAH_HEADER_CHECK_JOBS=4`), which is also its CTest `PROCESSORS`;
+  another value is a configure error. The object files stay in the build
+  tree: a rerun compiles only the headers that changed or include one that
+  changed.
 
 The installed tree is not checked: a header can still need a third-party
 header that the build has and the installation does not.
 `Tadah.MLIP/tests/header_check` tests the function (`ctest -R
-tadah_header_check`).
+tadah_header_check`), its refusals included.
