@@ -180,3 +180,56 @@ matches that line at the start of a line, so CTest reports the test as
 
 The regression tests for this machinery live in the umbrella repository,
 `Tadah.MLIP/tests/catch_discovery` (`ctest -R tadah_catch`).
+
+### Header self-containment: `tadah_add_header_check`
+
+`tadah_add_header_check(<target> [HEADER_DIRS <dir>...])`
+(`cmake/TadahTesting.cmake`) checks that every header of a module compiles
+on its own: each module's `tests/CMakeLists.txt` calls it once for its
+library (Tadah.MLIP for the `tadah` executable).
+
+```cmake
+tadah_add_header_check(tadah.foo)    # the headers of include/
+tadah_add_header_check(tadah.core HEADER_DIRS
+  ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/generated)
+```
+
+- Every `*.h` and `*.hpp` under the `HEADER_DIRS` (default: the `include/`
+  directory next to the `CMakeLists.txt` that defines the target) gets a
+  generated translation unit that includes it twice, by its path relative
+  to its directory (`#include <tadah/foo/bar.h>`): the header must compile
+  with nothing included before it, and the second inclusion must be
+  harmless (an include guard or `#pragma once`). A header that uses a type
+  without including its header, or has no guard, fails. The headers are
+  globbed with `CONFIGURE_DEPENDS`, so a new header is checked without
+  being registered; the same relative path in two of the `HEADER_DIRS` is
+  a configure error.
+- The translation units compile with what a consumer of the library gets:
+  they link the target, so its `PUBLIC` and `INTERFACE` include
+  directories, definitions and options apply, and its `PRIVATE` ones do
+  not. An executable cannot be linked; its own include directories,
+  definitions and options are used instead. The definitions of the calling
+  directory (`add_compile_definitions` of the module) and the target's C++
+  standard apply too. Each translation unit also has its own header's
+  `HEADER_DIRS` entry as an include directory, searched first, and no
+  other entry: a header that needs a directory the target keeps `PRIVATE`
+  fails, even when that directory is another of the `HEADER_DIRS` (CORE's
+  `generated/`, whose blueprint header users of `tadah.core` in the build
+  tree cannot include).
+- They form the object library `<target>_header_check`, which is not part
+  of `all`: a header that fails the check fails a test, not the build. The
+  CTest entry `<target>_headers` (label `headers`, so `ctest -L headers`
+  runs every module's) builds it with `cmake --build`, keeping going past
+  a failed header with the Makefile and Ninja generators, so its output
+  names every header that fails. It builds on as many processes as the
+  machine has physical cores, or on `TADAH_HEADER_CHECK_JOBS` (a whole
+  number, 1 or more, set when configuring:
+  `-DTADAH_HEADER_CHECK_JOBS=4`), which is also its CTest `PROCESSORS`;
+  another value is a configure error. The object files stay in the build
+  tree: a rerun compiles only the headers that changed or include one that
+  changed.
+
+The installed tree is not checked: a header can still need a third-party
+header that the build has and the installation does not.
+`Tadah.MLIP/tests/header_check` tests the function (`ctest -R
+tadah_header_check`), its refusals included.
