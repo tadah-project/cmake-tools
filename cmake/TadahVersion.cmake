@@ -22,6 +22,11 @@
 #        - ${Tadah.CORE_SOURCE_DIR}, set by CORE's own project() call.
 #      Callers therefore read the version AFTER their Tadah dependencies
 #      have been made available, then re-state project(... VERSION ...).
+#    * The version is the first `version = "..."` (or '...') line of the
+#      [TADAH] table: from the line holding only [TADAH] to the next line
+#      that starts with '['. The file is read as text, so square brackets
+#      and semicolons elsewhere in it (a key description "a number in
+#      (0, 1]") do not move or hide the table.
 #    * A missing blueprint, a missing [TADAH].version line or a version
 #      without a numeric M.m.p prefix is a configure error. There is no
 #      default version. REQUIRED is accepted for backward compatibility
@@ -83,24 +88,35 @@ function(tadah_read_version_from_blueprint output_var)
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_blueprint}")
 
   # ---- Parse [TADAH] table ---------------------------------------
-  file(STRINGS "${_blueprint}" _blueprintLines)
-  set(_isTadah OFF)
+  # The [TADAH] table runs from the line that holds only its header (blanks
+  # around it allowed) to the next line whose first non-blank character is
+  # '['. The file is read as one string, not as a CMake list of lines: in a
+  # list an unbalanced square bracket joins the lines up to the next bracket
+  # into one element and a semicolon splits a line, so blueprint text such
+  # as "a number in (0, 1]" hid the header. Carriage returns are dropped
+  # (file(STRINGS) dropped them).
+  file(READ "${_blueprint}" _text)
+  string(REPLACE "\r" "" _text "${_text}")
+  set(_text "\n${_text}\n")
   set(_tadahBlock "")
-  foreach(_line IN LISTS _blueprintLines)
-    # Begin section
-    if(_line MATCHES "^[ \t]*\\[TADAH\\][ \t]*$")
-      set(_isTadah ON)
-      continue()
+  string(REGEX MATCH "\n[ \t]*\\[TADAH\\][ \t]*\n" _header "${_text}")
+  if(_header)
+    # (string(FIND) finds the regex's leftmost match: an earlier copy of the
+    # matched text would have been an earlier match.)
+    string(FIND "${_text}" "${_header}" _at)
+    string(LENGTH "${_header}" _len)
+    math(EXPR _start "${_at} + ${_len} - 1")
+    # From the newline that ends the header line: every line of the table,
+    # each after its newline, up to the next header line.
+    string(SUBSTRING "${_text}" ${_start} -1 _rest)
+    string(REGEX MATCH "\n[ \t]*\\[" _next "${_rest}")
+    if(_next)
+      string(FIND "${_rest}" "${_next}" _end)
+      string(SUBSTRING "${_rest}" 0 ${_end} _tadahBlock)
+    else()
+      set(_tadahBlock "${_rest}")
     endif()
-    # End on next section header
-    if(_isTadah AND (_line MATCHES "^[ \t]*\\["))
-      set(_isTadah OFF)
-      break()
-    endif()
-    if(_isTadah)
-      set(_tadahBlock "${_tadahBlock}\n${_line}")
-    endif()
-  endforeach()
+  endif()
 
   # Match either double or single quotes around the version string
   string(REGEX MATCH
