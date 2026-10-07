@@ -124,10 +124,13 @@ endmacro()
 #  <target> gets (they link it; an executable, which cannot be linked,
 #  lends its own include directories, compile definitions and options
 #  instead), the definitions of the calling directory (such as a
-#  module's add_compile_definitions()), the target's C++ standard, and
-#  the HEADER_DIRS as include directories. The object files stay in the
-#  build tree, so a rerun recompiles only the headers that changed or
-#  that include a changed header.
+#  module's add_compile_definitions()) and the target's C++ standard.
+#  Each one also has its own header's HEADER_DIRS entry as an include
+#  directory, searched first, and no other entry: a header that needs a
+#  directory the target keeps PRIVATE fails even when that directory is
+#  another HEADER_DIRS entry (CORE's generated/). The object files stay
+#  in the build tree, so a rerun recompiles only the headers that changed
+#  or that include a changed header.
 #
 #  The CTest entry <target>_headers (label `headers`) builds that
 #  library, keeping going past a failed header with the Makefile and
@@ -190,6 +193,11 @@ function(tadah_add_header_check target)
       # re-configure does not recompile the checks.
       configure_file("${_TADAH_CMAKE_TOOLS_DIR}/testing/tadah_header_check.cpp.in"
                      "${_thc_root}/${_thc_rel}.cpp" @ONLY)
+      # Its own entry only, so that #include <rel> finds this header; a
+      # source file's include directories come before the target's
+      # (except with Xcode).
+      set_source_files_properties("${_thc_root}/${_thc_rel}.cpp" PROPERTIES
+        INCLUDE_DIRECTORIES "${_thc_dir}")
       list(APPEND _thc_tus "${_thc_root}/${_thc_rel}.cpp")
     endforeach()
   endforeach()
@@ -199,7 +207,6 @@ function(tadah_add_header_check target)
   endif()
 
   add_library(${_thc_name} OBJECT EXCLUDE_FROM_ALL ${_thc_tus})
-  target_include_directories(${_thc_name} BEFORE PRIVATE ${_thc_dirs})
   if(_thc_type STREQUAL "EXECUTABLE")
     # $<TARGET_PROPERTY> of these build properties includes the usage
     # requirements of the executable's link dependencies.
