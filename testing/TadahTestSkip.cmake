@@ -28,6 +28,21 @@
 # The C++ side spells the marker in tadah_test_skip.hpp (kSkipMarker); the
 # regression test Tadah.MLIP/tests/catch_discovery/check_skip.cmake checks
 # that both agree through a real CTest run.
+#
+# CTest has the SKIP_REGULAR_EXPRESSION test property from 3.16; an older
+# CTest ignores it and reports a skipped test Passed. Tests built with this
+# module (every Tadah module's: include(Catch)) therefore need CMake 3.16,
+# and an older one stops here, saying so; a module builds without its tests
+# (BUILD_TESTING OFF) on its own minimum. Checked by
+# Tadah.MLIP/tests/catch_discovery/check_skip_minimum.cmake.
+if(CMAKE_VERSION VERSION_LESS 3.16)
+  message(FATAL_ERROR
+    "Tadah's tests need CMake 3.16 or later: CTest reports a test case that "
+    "calls TADAH_SKIP as Skipped through the test property "
+    "SKIP_REGULAR_EXPRESSION, which an older CTest ignores, reporting the "
+    "test Passed. This is CMake ${CMAKE_VERSION}; use CMake 3.16 or later, "
+    "or configure with -DBUILD_TESTING=OFF")
+endif()
 
 set(TADAH_TEST_SKIP_MARKER "TADAH-SKIP: ")
 set(TADAH_TEST_SKIP_REGULAR_EXPRESSION "(^|\n)${TADAH_TEST_SKIP_MARKER}")

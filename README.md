@@ -142,6 +142,14 @@ writes the line `TADAH-SKIP: <reason>` to standard error. Every test that
 matches that line at the start of a line, so CTest reports the test as
 **Skipped** although it exits with 0.
 
+CTest has the `SKIP_REGULAR_EXPRESSION` test property from 3.16; an older
+CTest ignores it and reports a skipped test as Passed. The tests therefore
+need CMake 3.16: `TadahTestSkip.cmake`, which `include(Catch)` and the
+discovery script include, stops the configure step on an older CMake with
+a message that says so. A module still builds without its tests
+(`BUILD_TESTING` OFF) on the CMake its `cmake_minimum_required()` names
+(3.15).
+
 - A skip request never hides a failure of the same test case: a check that
   failed before `TADAH_SKIP`, in another `SECTION`, or after `TADAH_SKIP`
   returned from a helper function or lambda (it returns only from that
@@ -179,7 +187,8 @@ matches that line at the start of a line, so CTest reports the test as
   prints a line that its own `SKIP_REGULAR_EXPRESSION` matches.
 
 The regression tests for this machinery live in the umbrella repository,
-`Tadah.MLIP/tests/catch_discovery` (`ctest -R tadah_catch`).
+`Tadah.MLIP/tests/catch_discovery` (`ctest -R tadah_catch`;
+`tadah_catch_skip_cmake_minimum` checks the CMake 3.16 refusal).
 
 ### Header self-containment: `tadah_add_header_check`
 
