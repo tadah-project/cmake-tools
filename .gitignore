@@ -15,9 +15,6 @@ install_manifest.txt
 .idea/
 .cache/
 
-# Claude Code per-project state
-.claude/
-
 # Python
 __pycache__/
 *.pyc
