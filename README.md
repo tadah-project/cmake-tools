@@ -242,3 +242,39 @@ The installed tree is not checked: a header can still need a third-party
 header that the build has and the installation does not.
 `Tadah.MLIP/tests/header_check` tests the function (`ctest -R
 tadah_header_check`), its refusals included.
+
+### Text check: `tadah_add_text_check`
+
+`tadah_add_text_check(<name> [ROOT <dir>])` (`cmake/TadahTesting.cmake`)
+adds the CTest entry `<name>_text` (label `text`, so `ctest -L text` runs
+every module's), which reads the text files of a repository and fails on
+each line that carries a person's initials, a reference to co-workers, a
+decision attributed to the code's owner, the name or state directory of an
+AI tool, a note kept outside the repository, or filler wording, naming the
+file, the rule and the line. Each module's `tests/CMakeLists.txt` calls it
+once for its repository (`ROOT` defaults to the project's source
+directory); Tadah.MLIP also checks cmake-tools.
+
+```cmake
+tadah_add_text_check(tadah.foo)                          # this repository
+tadah_add_text_check(cmake-tools ROOT ${tadah_cmake_SOURCE_DIR})
+```
+
+- `testing/tadah_text_check.cmake` holds the rules (each pattern writes one
+  letter in brackets, so the script does not match itself), the file names
+  it reads (sources, headers, CMake, Markdown, reStructuredText, TOML,
+  Python, shell, configuration and potential files, `.gitignore`, and files
+  without an extension of at most 1 MiB) and the directories it skips at
+  any depth (`.git`, `external`, `third_party`, `_deps`, `catch2`, `build*`,
+  `cmake-build-*`).
+- When CMake finds git and the root is the top of a git work tree (a clone,
+  a FetchContent checkout), the files read are those git tracks or would
+  track (`git ls-files --cached --others --exclude-standard`): what a build
+  or a run writes into the tree and git ignores is not read. Otherwise (a
+  source tarball, a directory inside a work tree) every file under the root
+  is.
+- The function refuses an unexpected argument, `ROOT` without a value and a
+  `ROOT` that is not a directory.
+
+`Tadah.MLIP/tests/text_check` tests the function and the script (`ctest -R
+tadah_text_check_tool`), its refusals included.
