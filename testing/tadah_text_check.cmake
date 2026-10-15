@@ -1,6 +1,6 @@
 # Text check of a source tree (tadah_add_text_check, cmake/TadahTesting.cmake).
 #
-#   cmake -DTADAH_TEXT_ROOT=<dir> -P tadah_text_check.cmake
+#   cmake -DTADAH_TEXT_ROOT=<dir> [-DGIT=<git>] -P tadah_text_check.cmake
 #
 # Reads every text file under TADAH_TEXT_ROOT and fails on each line that
 # matches one of the rules below, printing
@@ -27,7 +27,12 @@
 #                             the repository cannot open
 #   a stock phrase            filler wording (the patterns of _ttc_rule_5)
 #
-# Text files: the names ending in .c .cc .cpp .cxx .h .hh .hpp .hxx .ipp
+# The files: with GIT, when TADAH_TEXT_ROOT is the top of a git work tree
+# (a clone, a FetchContent checkout), those git tracks or would track (git
+# ls-files --cached --others --exclude-standard), so that what a build or a
+# run writes into the tree and git ignores is not read; otherwise (no git, a
+# source tarball, a directory inside a work tree) every file under the
+# root. Of these, the text files: the names ending in .c .cc .cpp .cxx .h .hh .hpp .hxx .ipp
 # .inl .in .txt .md .rst .toml .py .cmake .cff .yml .yaml .sh .bash .cfg
 # .ini .hpo .tadah, .gitignore and .gitattributes, and files without an
 # extension of at most 1 MiB (configuration files, LICENSE, Makefile; data
@@ -63,8 +68,37 @@ set(_ttc_any "${_ttc_rule_0}|${_ttc_rule_1}|${_ttc_rule_2}|${_ttc_rule_3}|${_ttc
 set(_ttc_text_name "\\.(c|cc|cpp|cxx|h|hh|hpp|hxx|ipp|inl|in|txt|md|rst|toml|py|cmake|cff|yml|yaml|sh|bash|cfg|ini|hpo|tadah)$|^\\.git(ignore|attributes)$")
 set(_ttc_skip_dir "^(\\.git|external|third_party|_deps|catch2|build.*|cmake-build-.*)$")
 
-file(GLOB_RECURSE _ttc_files LIST_DIRECTORIES false RELATIVE "${_ttc_root}"
-     "${_ttc_root}/*")
+set(_ttc_from "every file under the root")
+set(_ttc_use_git FALSE)
+if(DEFINED GIT AND NOT "${GIT}" STREQUAL "")
+  execute_process(COMMAND "${GIT}" -C "${_ttc_root}" rev-parse --show-toplevel
+                  RESULT_VARIABLE _ttc_r OUTPUT_VARIABLE _ttc_top
+                  ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(_ttc_r EQUAL 0)
+    get_filename_component(_ttc_top "${_ttc_top}" REALPATH)
+    get_filename_component(_ttc_root_real "${_ttc_root}" REALPATH)
+    if(_ttc_top STREQUAL _ttc_root_real)
+      set(_ttc_use_git TRUE)
+    endif()
+  endif()
+endif()
+if(_ttc_use_git)
+  execute_process(COMMAND "${GIT}" -c core.quotepath=off -C "${_ttc_root}"
+                          ls-files --cached --others --exclude-standard
+                  RESULT_VARIABLE _ttc_r OUTPUT_VARIABLE _ttc_out
+                  ERROR_VARIABLE _ttc_err)
+  if(NOT _ttc_r EQUAL 0)
+    message(FATAL_ERROR "tadah_text_check.cmake: git ls-files failed in "
+                        "${_ttc_root}: ${_ttc_err}")
+  endif()
+  string(REGEX REPLACE "\n$" "" _ttc_out "${_ttc_out}")
+  string(REPLACE "\n" ";" _ttc_files "${_ttc_out}")
+  set(_ttc_from "the files git tracks or would track")
+else()
+  file(GLOB_RECURSE _ttc_files LIST_DIRECTORIES false RELATIVE "${_ttc_root}"
+       "${_ttc_root}/*")
+endif()
+list(REMOVE_DUPLICATES _ttc_files)
 list(SORT _ttc_files)
 
 set(_ttc_count 0)
@@ -89,6 +123,10 @@ foreach(_ttc_rel IN LISTS _ttc_files)
     continue()
   endif()
   set(_ttc_path "${_ttc_root}/${_ttc_rel}")
+  # A tracked file deleted from the work tree is not there to read.
+  if(NOT EXISTS "${_ttc_path}" OR IS_DIRECTORY "${_ttc_path}")
+    continue()
+  endif()
   if(NOT _ttc_name MATCHES "${_ttc_text_name}")
     if(_ttc_name MATCHES "\\.")
       continue()
@@ -132,7 +170,8 @@ endforeach()
 
 if(_ttc_count GREATER 0)
   message(FATAL_ERROR "${_ttc_count} lines in ${_ttc_read} text files of "
-                      "${_ttc_root} match a rule of tadah_text_check.cmake")
+                      "${_ttc_root} (${_ttc_from}) match a rule of "
+                      "tadah_text_check.cmake")
 endif()
-message(NOTICE "0 lines in ${_ttc_read} text files of ${_ttc_root} match a "
-               "rule of tadah_text_check.cmake")
+message(NOTICE "0 lines in ${_ttc_read} text files of ${_ttc_root} "
+               "(${_ttc_from}) match a rule of tadah_text_check.cmake")

@@ -283,7 +283,9 @@ endfunction()
 #  to the code's owner, the name or state directory of an AI tool, a note
 #  kept outside the repository, or filler wording. That script lists the
 #  rules, the files it reads and the directories it skips (vendored code,
-#  .git, build trees).
+#  .git, build trees). When CMake finds git and ROOT is the top of a git
+#  work tree, the files read are those git tracks or would track, so that
+#  ignored files (a build's or a run's outputs) are not read.
 # ====================================================================
 function(tadah_add_text_check name)
   cmake_parse_arguments(PARSE_ARGV 1 _ttc "" "ROOT" "")
@@ -303,8 +305,10 @@ function(tadah_add_text_check name)
     message(FATAL_ERROR "tadah_add_text_check(${name}): ROOT ${_ttc_ROOT} "
                         "is not a directory")
   endif()
+  find_package(Git QUIET)
   add_test(NAME ${name}_text
     COMMAND "${CMAKE_COMMAND}" "-DTADAH_TEXT_ROOT=${_ttc_ROOT}"
+            "-DGIT=${GIT_EXECUTABLE}"
             -P "${_TADAH_CMAKE_TOOLS_DIR}/testing/tadah_text_check.cmake")
   set_tests_properties(${name}_text PROPERTIES
     LABELS text
