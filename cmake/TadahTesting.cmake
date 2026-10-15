@@ -266,3 +266,47 @@ function(tadah_add_header_check target)
     PROCESSORS ${_thc_jobs}
     RESOURCE_LOCK tadah_header_check)
 endfunction()
+
+# ====================================================================
+#  Text check
+#
+#  Usage in a module's tests/CMakeLists.txt:
+#
+#     tadah_add_text_check(tadah.foo)
+#     tadah_add_text_check(<name> ROOT <dir>)
+#
+#  The CTest entry <name>_text (label `text`) reads every text file under
+#  ROOT (default: the calling project's source directory, the module's
+#  repository) and fails on each line that matches a rule of
+#  testing/tadah_text_check.cmake, naming the file, the rule and the line:
+#  a person's initials, a reference to co-workers, a decision attributed
+#  to the code's owner, the name or state directory of an AI tool, a note
+#  kept outside the repository, or filler wording. That script lists the
+#  rules, the files it reads and the directories it skips (vendored code,
+#  .git, build trees).
+# ====================================================================
+function(tadah_add_text_check name)
+  cmake_parse_arguments(PARSE_ARGV 1 _ttc "" "ROOT" "")
+  if(_ttc_UNPARSED_ARGUMENTS)
+    message(FATAL_ERROR "tadah_add_text_check(${name}): unexpected "
+                        "arguments: ${_ttc_UNPARSED_ARGUMENTS}")
+  endif()
+  if("ROOT" IN_LIST _ttc_KEYWORDS_MISSING_VALUES)
+    message(FATAL_ERROR "tadah_add_text_check(${name}): ROOT names no "
+                        "directory")
+  endif()
+  if(NOT DEFINED _ttc_ROOT)
+    set(_ttc_ROOT "${PROJECT_SOURCE_DIR}")
+  endif()
+  get_filename_component(_ttc_ROOT "${_ttc_ROOT}" ABSOLUTE)
+  if(NOT IS_DIRECTORY "${_ttc_ROOT}")
+    message(FATAL_ERROR "tadah_add_text_check(${name}): ROOT ${_ttc_ROOT} "
+                        "is not a directory")
+  endif()
+  add_test(NAME ${name}_text
+    COMMAND "${CMAKE_COMMAND}" "-DTADAH_TEXT_ROOT=${_ttc_ROOT}"
+            -P "${_TADAH_CMAKE_TOOLS_DIR}/testing/tadah_text_check.cmake")
+  set_tests_properties(${name}_text PROPERTIES
+    LABELS text
+    TIMEOUT 300)
+endfunction()
