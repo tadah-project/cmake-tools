@@ -314,3 +314,32 @@ function(tadah_add_text_check name)
     LABELS text
     TIMEOUT 300)
 endfunction()
+
+# ====================================================================
+#  Git base address check
+#
+#  Usage in a module's tests/CMakeLists.txt:
+#
+#     tadah_add_git_base_check(tadah.foo)
+#
+#  The CTest entry <name>_git_base (label `cmake`) checks the calling
+#  project's CMakeLists.txt with testing/tadah_git_base_check.cmake: it
+#  carries the TADAH_GIT_BASE block of testing/tadah_git_base_block.cmake
+#  unchanged, before its first FetchContent_Declare, and fetches every
+#  Tadah! repository as ${TADAH_GIT_BASE}/<repository>.git; the block gives
+#  the public address unless -DTADAH_GIT_BASE or the environment variable
+#  TADAH_GIT_BASE names another.
+# ====================================================================
+function(tadah_add_git_base_check name)
+  if(ARGN)
+    message(FATAL_ERROR "tadah_add_git_base_check(${name}): unexpected "
+                        "arguments: ${ARGN}")
+  endif()
+  add_test(NAME ${name}_git_base
+    COMMAND "${CMAKE_COMMAND}"
+            "-DTADAH_CMAKELISTS=${PROJECT_SOURCE_DIR}/CMakeLists.txt"
+            -P "${_TADAH_CMAKE_TOOLS_DIR}/testing/tadah_git_base_check.cmake")
+  set_tests_properties(${name}_git_base PROPERTIES
+    LABELS cmake
+    TIMEOUT 120)
+endfunction()

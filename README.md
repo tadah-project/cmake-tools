@@ -7,7 +7,7 @@ Add to a project with FetchContent:
 ```cmake
 include(FetchContent)
 FetchContent_Declare(tadah_cmake
-  GIT_REPOSITORY https://git.ecdf.ed.ac.uk/tadah/cmake-tools.git
+  GIT_REPOSITORY https://github.com/tadah-project/cmake-tools.git
   GIT_TAG        v1-dev)          # the Tadah modules' development pin
 FetchContent_MakeAvailable(tadah_cmake)
 
@@ -18,6 +18,19 @@ The Tadah modules fetch cmake-tools at `v1-dev` during development. A
 release tags cmake-tools (`v1.6.0`) and pins that tag in all seven modules
 in the release commit (`Tadah.MLIP/RELEASING.md`).
 
+## Git base address
+
+The Tadah modules fetch cmake-tools and each other as
+`${TADAH_GIT_BASE}/<repository>.git`. `TADAH_GIT_BASE` is set by the
+block of `testing/tadah_git_base_block.cmake`, which each module's
+`CMakeLists.txt` carries unchanged before its first `FetchContent_Declare`
+(it is needed before cmake-tools itself is fetched):
+`-DTADAH_GIT_BASE=<address>`, else the environment variable of that name
+when it is set and not empty, else `https://github.com/tadah-project`.
+`tadah_add_git_base_check(<name>)` (`cmake/TadahTesting.cmake`) adds the
+test `<name>_git_base` (label `cmake`), which checks the block and the
+addresses.
+
 ## Branch detection
 
 `tadah_get_git_branch(<var>)` (`cmake/TadahDevelop.cmake`) names the git
@@ -25,8 +38,8 @@ ref every Tadah module fetches its sibling modules at
 (`GIT_TAG ${TADAH_GIT_BRANCH}`). A value already set, such as
 `-DTADAH_GIT_BRANCH=v1.6.0`, is kept. Otherwise the first of these is used:
 
-1. `$CI_COMMIT_REF_NAME` (GitLab CI: the branch, or the tag of a tag
-   pipeline);
+1. `$CI_COMMIT_REF_NAME` (a CI pipeline that sets it: the branch, or the
+   tag of a tag pipeline);
 2. `$READTHEDOCS_GIT_IDENTIFIER` (Read the Docs: the branch or tag it
    checked out; its `latest` and `stable` versions are named after no ref),
    then `$READTHEDOCS_VERSION_NAME` and `$READTHEDOCS_VERSION`;
@@ -250,8 +263,12 @@ adds the CTest entry `<name>_text` (label `text`, so `ctest -L text` runs
 every module's), which reads the text files of a repository and fails on
 each line that carries a person's initials, a reference to co-workers, a
 decision attributed to the code's owner, the name or state directory of an
-AI tool, a note kept outside the repository, or filler wording, naming the
-file, the rule and the line. Each module's `tests/CMakeLists.txt` calls it
+AI tool, a note kept outside the repository, filler wording, or the
+address of the development host, naming the file, the rule and the line.
+In published text (the `.rst`, `.md` and `.txt` files under `docs/` and
+`examples/`, and every `README*`, `CHANGELOG.md`, `CITATION.*`,
+`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` and `SECURITY.md`) the name of the
+development host's software is refused as well. Each module's `tests/CMakeLists.txt` calls it
 once for its repository (`ROOT` defaults to the project's source
 directory); Tadah.MLIP also checks cmake-tools.
 
@@ -277,4 +294,5 @@ tadah_add_text_check(cmake-tools ROOT ${tadah_cmake_SOURCE_DIR})
   `ROOT` that is not a directory.
 
 `Tadah.MLIP/tests/text_check` tests the function and the script (`ctest -R
-tadah_text_check_tool`), its refusals included.
+tadah_text_check_tool`), its refusals included; `Tadah.MLIP/tests/git_base`
+tests the git base address check (`ctest -R tadah_git_base_check_tool`).
