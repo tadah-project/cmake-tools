@@ -26,6 +26,18 @@
 #                             lanes and their scripts), which a reader of
 #                             the repository cannot open
 #   a stock phrase            filler wording (the patterns of _ttc_rule_5)
+#   a development host        the address of the development GitLab host,
+#                             which readers outside its network cannot
+#                             reach; a build, a CI job or a page names the
+#                             public host, or takes the base address from
+#                             TADAH_GIT_BASE
+#   a development host name   the name of the development host's software,
+#                             in published text only: the .rst, .md and .txt
+#                             files under docs/ and examples/ (pages and
+#                             the files they include), and the files named
+#                             README*, CHANGELOG.md, CITATION.*,
+#                             CONTRIBUTING.md, CODE_OF_CONDUCT.md and
+#                             SECURITY.md at any depth
 #
 # The files: with GIT, when TADAH_TEXT_ROOT is the top of a git work tree
 # (a clone, a FetchContent checkout), those git tracks or would track (git
@@ -56,14 +68,21 @@ set(_ttc_rule_names
   "a decision note"
   "an AI tool"
   "a workspace note"
-  "a stock phrase")
+  "a stock phrase"
+  "a development host"
+  "a development host name")
 set(_ttc_rule_0 "(^|[^A-Za-z0-9_])M[K]([^A-Za-z0-9_]|$)")
 set(_ttc_rule_1 "[Cc]o[l]league")
 set(_ttc_rule_2 "[Oo]w[n]er('s)? decision")
 set(_ttc_rule_3 "C[l]aude|A[n]thropic|Chat[G]PT|[Cc]o-[Aa]u[t]hored-[Bb]y|[.]c[l]aude")
 set(_ttc_rule_4 "R[E]LEASE-[0-9.]+-FOLLOWUPS|B[U]GS-unified|F[E]ATURE-REQUEST-|(^|[^A-Za-z])l[a]nes/[A-Za-z]|t[m]p/autonomous|U[D]M-[0-9]")
 set(_ttc_rule_5 "[Dd]e[l]ve|[Ss]ea[m]less|worth [n]oting|important to [n]ote")
-set(_ttc_any "${_ttc_rule_0}|${_ttc_rule_1}|${_ttc_rule_2}|${_ttc_rule_3}|${_ttc_rule_4}|${_ttc_rule_5}")
+set(_ttc_rule_6 "git[.]ecdf[.]ed[.]ac[.]uk")
+set(_ttc_rule_7 "[Gg]it[L]ab")
+# Every file is read with rules 0-6; a published file with rule 7 as well.
+set(_ttc_any "${_ttc_rule_0}|${_ttc_rule_1}|${_ttc_rule_2}|${_ttc_rule_3}|${_ttc_rule_4}|${_ttc_rule_5}|${_ttc_rule_6}")
+set(_ttc_any_published "${_ttc_any}|${_ttc_rule_7}")
+set(_ttc_published "^(docs|examples)/.*\\.(rst|md|txt)$|(^|/)(README[^/]*|CHANGELOG\\.md|CITATION\\.[^/]*|CONTRIBUTING\\.md|CODE_OF_CONDUCT\\.md|SECURITY\\.md)$")
 
 set(_ttc_text_name "\\.(c|cc|cpp|cxx|h|hh|hpp|hxx|ipp|inl|in|txt|md|rst|toml|py|cmake|cff|yml|yaml|sh|bash|cfg|ini|hpo|tadah)$|^\\.git(ignore|attributes)$")
 set(_ttc_skip_dir "^(\\.git|external|third_party|_deps|catch2|build.*|cmake-build-.*)$")
@@ -137,7 +156,14 @@ foreach(_ttc_rel IN LISTS _ttc_files)
     endif()
   endif()
   math(EXPR _ttc_read "${_ttc_read} + 1")
-  file(STRINGS "${_ttc_path}" _ttc_lines REGEX "${_ttc_any}" ENCODING UTF-8)
+  if(_ttc_rel MATCHES "${_ttc_published}")
+    set(_ttc_file_any "${_ttc_any_published}")
+    set(_ttc_last_rule 7)
+  else()
+    set(_ttc_file_any "${_ttc_any}")
+    set(_ttc_last_rule 6)
+  endif()
+  file(STRINGS "${_ttc_path}" _ttc_lines REGEX "${_ttc_file_any}" ENCODING UTF-8)
   # The matching lines are one CMake list. A ';' in a line splits it into
   # several elements, and a '[' without its ']' in an element keeps the
   # next ';' from splitting, which would merge lines: the brackets are
@@ -146,7 +172,7 @@ foreach(_ttc_rel IN LISTS _ttc_files)
   string(REPLACE "]" ")" _ttc_lines "${_ttc_lines}")
   foreach(_ttc_line IN LISTS _ttc_lines)
     set(_ttc_rule "")
-    foreach(_ttc_i RANGE 5)
+    foreach(_ttc_i RANGE ${_ttc_last_rule})
       if(_ttc_line MATCHES "${_ttc_rule_${_ttc_i}}")
         list(GET _ttc_rule_names ${_ttc_i} _ttc_rule)
         break()
