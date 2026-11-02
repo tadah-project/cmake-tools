@@ -122,7 +122,7 @@ function(tadah_get_git_branch out_var)
         message(WARNING
           "tadah_get_git_branch: cannot determine the git branch of "
           "${CMAKE_SOURCE_DIR} (detached HEAD or not a git checkout). "
-          "Pass -D${out_var}=<branch> if Tadah modules must be fetched.")
+          "-D${out_var}=<branch> names the branch to fetch the Tadah modules from.")
       endif()
       message(STATUS "No tracking branch found, using local branch: ${_branch}")
     endif()
