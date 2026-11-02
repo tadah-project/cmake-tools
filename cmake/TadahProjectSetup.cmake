@@ -22,7 +22,7 @@ function(tadah_project_setup)
   if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
       "In-source builds are not allowed.\n"
-      "Create a separate build directory and run CMake from there.")
+      "The build directory must differ from the source directory (for example: cmake -S . -B build).")
   endif()
 
   # ---- C++ standard ---------------------------------------------
